@@ -1,2 +1,4 @@
 .vscode
 .env
+roi_*.txt
+__pycache__
