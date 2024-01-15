@@ -1,5 +1,6 @@
 import cv2
 from colors import ColorsBGR
+from camera import capture
 
 
 class ROI:
@@ -17,7 +18,7 @@ class ROI:
         self.label = label
 
     def _capture(self):
-        capture = cv2.VideoCapture(2)
+        # capture = cv2.VideoCapture(index=2)
         for i in range(10):
             ret, frame = capture.read()
         ret, frame = capture.read()
@@ -28,7 +29,7 @@ class ROI:
                             showCrosshair=True)
         cv2.destroyWindow(WINDOW_NAME)
         x, y, w, h = roi
-        capture.release()
+        # capture.release()
         return x, y, w, h
 
     def save(self):

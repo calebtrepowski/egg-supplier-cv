@@ -1,60 +1,82 @@
 from inference_sdk import InferenceHTTPClient, InferenceConfiguration
-import requests
 from dotenv import dotenv_values
 import cv2
 from roi import ROI
 from prediction import Prediction
+from camera import capture
 
 config = dotenv_values(".env")
-PROJECT_ID = config["ROBOFLOW_PROJECT_ID"]
-MODEL_VERSION = config["ROBOFLOW_MODEL_VERSION"]
-CONFIDENCE_THRESHOLD = 0.75
 
-client = InferenceHTTPClient(
-    api_url="http://localhost:8080",
-    api_key=config["ROBOFLOW_API_KEY"]
-)
-client.configure(InferenceConfiguration(
-    confidence_threshold=CONFIDENCE_THRESHOLD))
-client.select_api_v0()
 
-eggs_roi = ROI("eggs")
-eggs_roi.load()
+class EggPredicter:
+    PROJECT_ID: str = config["ROBOFLOW_PROJECT_ID"]
+    MODEL_VERSION: str = config["ROBOFLOW_MODEL_VERSION"]
+    inference_client: InferenceHTTPClient
+    eggs_roi: ROI
 
-capture = cv2.VideoCapture(2)
+    def __init__(self, confidence_threshold: float):
 
-while True:
-    ret, frame = capture.read()
-    if not ret:
-        print("Error reading image from camera")
-        exit()
+        self.inference_client = InferenceHTTPClient(
+            api_url="http://localhost:8080",
+            api_key=config["ROBOFLOW_API_KEY"]
+        )
 
-    eggs_roi_frame = eggs_roi.get_frame(frame)
-    eggs_roi.draw(frame)
+        self.inference_client.configure(InferenceConfiguration(
+            confidence_threshold=confidence_threshold))
+        self.inference_client.select_api_v0()
 
-    try:
-        results = client.infer(
+        self.eggs_roi = ROI("eggs")
+        self.eggs_roi.load()
+
+    def calibrate_roi(self):
+        self.eggs_roi.save()
+
+    def set_confidence(self, new_confidence: float):
+        self.inference_client.configure(InferenceConfiguration(
+            confidence_threshold=new_confidence))
+
+    def predict(self, frame: cv2.typing.MatLike) -> list[Prediction]:
+        eggs_roi_frame = self.eggs_roi.get_frame(frame)
+        self.eggs_roi.draw(frame)
+        results = self.inference_client.infer(
             eggs_roi_frame,
-            model_id=f"{PROJECT_ID}/{MODEL_VERSION}")
-    except requests.exceptions.ConnectionError:
-        print("********\nRoboflow server not connected. See README file for setup commands.\n********")
-        exit()
+            model_id=f"{EggPredicter.PROJECT_ID}/{EggPredicter.MODEL_VERSION}")["predictions"]
+        predictions = []
+        for prediction in results:
+            cx = int(prediction["x"]) + self.eggs_roi.x
+            cy = int(prediction["y"]) + self.eggs_roi.y
+            width = int(prediction["width"])
+            height = int(prediction["height"])
+            confidence = prediction["confidence"]
+            label = prediction["class"]
 
-    for prediction in results["predictions"]:
-        cx = int(prediction["x"]) + eggs_roi.x
-        cy = int(prediction["y"]) + eggs_roi.y
-        width = int(prediction["width"])
-        height = int(prediction["height"])
-        confidence = prediction["confidence"]
-        label = prediction["class"]
+            prediction = Prediction(cx, cy, width, height, confidence, label)
+            predictions.append(prediction)
+            prediction.draw(frame)
 
-        prediction = Prediction(cx, cy, width, height, confidence, label)
-        prediction.draw(frame)
+        return predictions
 
-    cv2.imshow('Eggs/Holes Prediction', frame)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+if __name__ == "__main__":
+    import cv2
+    egg_predicter = EggPredicter(0.1)
 
-capture.release()
-cv2.destroyAllWindows()
+    # capture = cv2.VideoCapture(2)
+
+    while True:
+        ret, frame = capture.read()
+        if not ret:
+            print("Error reading image from camera")
+            exit()
+        try:
+            predictions = egg_predicter.predict(frame)
+        except Exception as e:
+            print(e)
+            continue
+        cv2.imshow('Predicter', frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    capture.release()
+    cv2.destroyAllWindows()
