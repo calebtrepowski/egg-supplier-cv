@@ -3,7 +3,6 @@ from dotenv import dotenv_values
 import cv2
 from roi import ROI
 from prediction import Prediction
-from camera import capture
 
 config = dotenv_values(".env")
 
@@ -14,7 +13,7 @@ class EggPredicter:
     inference_client: InferenceHTTPClient
     eggs_roi: ROI
 
-    def __init__(self, confidence_threshold: float):
+    def __init__(self, confidence_threshold: float, capture: cv2.VideoCapture):
 
         self.inference_client = InferenceHTTPClient(
             api_url="http://localhost:8080",
@@ -26,10 +25,10 @@ class EggPredicter:
         self.inference_client.select_api_v0()
 
         self.eggs_roi = ROI("eggs")
-        self.eggs_roi.load()
+        self.eggs_roi.load(capture)
 
-    def calibrate_roi(self):
-        self.eggs_roi.save()
+    def calibrate_roi(self, capture: cv2.VideoCapture):
+        self.eggs_roi.save(capture)
 
     def set_confidence(self, new_confidence: float):
         self.inference_client.configure(InferenceConfiguration(
@@ -57,26 +56,26 @@ class EggPredicter:
         return predictions
 
 
-if __name__ == "__main__":
-    import cv2
-    egg_predicter = EggPredicter(0.1)
+# if __name__ == "__main__":
+#     import cv2
+#     egg_predicter = EggPredicter(0.1)
 
-    # capture = cv2.VideoCapture(2)
+#     # capture = cv2.VideoCapture(2)
 
-    while True:
-        ret, frame = capture.read()
-        if not ret:
-            print("Error reading image from camera")
-            exit()
-        try:
-            predictions = egg_predicter.predict(frame)
-        except Exception as e:
-            print(e)
-            continue
-        cv2.imshow('Predicter', frame)
+#     while True:
+#         ret, frame = capture.read()
+#         if not ret:
+#             print("Error reading image from camera")
+#             exit()
+#         try:
+#             predictions = egg_predicter.predict(frame)
+#         except Exception as e:
+#             print(e)
+#             continue
+#         cv2.imshow('Predicter', frame)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+#         if cv2.waitKey(1) & 0xFF == ord('q'):
+#             break
 
-    capture.release()
-    cv2.destroyAllWindows()
+#     capture.release()
+#     cv2.destroyAllWindows()

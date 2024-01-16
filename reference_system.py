@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from roi import ROI
-from camera import capture
 
 
 class ReferenceCircle:
@@ -10,33 +9,35 @@ class ReferenceCircle:
     position_robot: np.array
     roi: ROI
 
-    def __init__(self, label: str, position_robot: tuple | list):
+    def __init__(self, label: str, position_robot: tuple | list, capture: cv2.VideoCapture):
         self.position_robot = np.array(position_robot, dtype=np.float32)
         self.roi = ROI(label)
-        self.roi.load()
+        self.roi.load(capture)
         self.position_camera = None
 
-    def update_roi(self):
-        self.roi.save()
+    def update_roi(self, capture: cv2.VideoCapture):
+        self.roi.save(capture)
 
     def draw(self, frame: cv2.typing.MatLike):
         self.roi.draw(frame)
         if self.position_camera is not None:
             cv2.circle(frame,
-                       (self.position_camera[0] + self.roi.x,
-                        self.position_camera[1] + self.roi.y),
+                       (self.position_camera[0],
+                        self.position_camera[1]),
                        self.radius_camera,
                        (0, 140, 255),
                        thickness=1)
             cv2.circle(frame,
-                       (self.position_camera[0] + self.roi.x,
-                        self.position_camera[1] + self.roi.y),
+                       (self.position_camera[0],
+                        self.position_camera[1]),
                        2,
                        (0, 140, 255),
-                       thickness=2)
+                       thickness=4)
+        else:
+            print("position camera is None")
 
-    def update_position_camera(self):
-        self.roi.load()
+    def update_position_camera(self, capture: cv2.VideoCapture):
+        self.roi.load(capture)
 
         max_circle = None
 
@@ -86,11 +87,27 @@ class ReferenceCircle:
                  max_circle[1]+self.roi.y))
             self.radius_camera = max_circle[2]
 
-        # self.roi.draw(frame)
-        # cv2.imshow("Reference Circle", frame)
-        # cv2.waitKey(0)
+        self.roi.draw(frame)
+        cv2.imshow("Reference Circle", frame)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
         # capture.release()
+
+
+class ReferenceSystem:
+    reference_1: ReferenceCircle
+    reference_2: ReferenceCircle
+    reference_3: ReferenceCircle
+    reference_4: ReferenceCircle
+
+    TRANSFORMATION_MATRIX = np.array(((-1, 0), (0, 1)))
+
+    def __init__(self, capture: cv2.VideoCapture):
+        self.reference_1 = ReferenceCircle("reference_1", (132, 79), capture)
+        self.reference_2 = ReferenceCircle("reference_2", (-138, 91), capture)
+        self.reference_3 = ReferenceCircle("reference_3", (-138, 337), capture)
+        self.reference_4 = ReferenceCircle("reference_4", (132, 335), capture)
 
 
 TRANSFORMATION_MATRIX = np.array(((-1, 0), (0, 1)))
@@ -109,16 +126,16 @@ if __name__ == "__main__":
     # image = cv2.imread(
     #     "homography-2.png")
 
-    reference_1 = ReferenceCircle("reference_1", (132, 80))
-    reference_2 = ReferenceCircle("reference_2", (-138, 94))
-    reference_3 = ReferenceCircle("reference_3", (-138, 460))
-    reference_4 = ReferenceCircle("reference_4", (132, 413))
+    reference_1 = ReferenceCircle("reference_1", (132, 79))
+    reference_2 = ReferenceCircle("reference_2", (-138, 91))
+    reference_3 = ReferenceCircle("reference_3", (-138, 337))
+    reference_4 = ReferenceCircle("reference_4", (132, 335))
 
-    # reference_1.update_roi()
+    reference_1.update_roi()
     while reference_1.position_camera is None:
         reference_1.update_position_camera()
 
-    # reference_2.update_roi()
+    reference_2.update_roi()
     while reference_2.position_camera is None:
         reference_2.update_position_camera()
 
