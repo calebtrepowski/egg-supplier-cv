@@ -8,12 +8,24 @@ class ReferenceCircle:
     radius_camera: int
     position_robot: np.array
     roi: ROI
+    label: str
 
     def __init__(self, label: str, position_robot: tuple | list, capture: cv2.VideoCapture):
         self.position_robot = np.array(position_robot, dtype=np.float32)
+        self.label = label
         self.roi = ROI(label)
         self.roi.load(capture)
         self.position_camera = None
+        self.radius_camera = None
+
+        try:
+            with open(f"position_camera_{self.label}.txt") as f:
+                position_camera_str = f.read().rstrip("\n").split(",")
+                x, y, radius = [int(i) for i in position_camera_str]
+                self.position_camera = np.array((x, y))
+                self.radius_camera = radius
+        except Exception as e:
+            print(f"Couldn't read camera position of {self.label}")
 
     def update_roi(self, capture: cv2.VideoCapture):
         self.roi.save(capture)
@@ -57,10 +69,6 @@ class ReferenceCircle:
                 minRadius=5,
                 maxRadius=50
             )
-            # minRadius=int(max(self.roi.width,
-            #               self.roi.height)/5),
-            # maxRadius=int(max(self.roi.width,
-            #               self.roi.height)/2)
 
             if circles is not None:
                 circles = np.uint16(np.around(circles))
@@ -87,12 +95,15 @@ class ReferenceCircle:
                  max_circle[1]+self.roi.y))
             self.radius_camera = max_circle[2]
 
+            with open(f"position_camera_{self.label}.txt", "w") as f:
+                write_str = f"{self.position_camera[0]},{self.position_camera[1]},{self.radius_camera}\n"
+                f.write(write_str)
+
         self.roi.draw(frame)
         cv2.imshow("Reference Circle", frame)
         cv2.waitKey(0)
+        print("destroying windows")
         cv2.destroyAllWindows()
-
-        # capture.release()
 
 
 class ReferenceSystem:
@@ -101,13 +112,61 @@ class ReferenceSystem:
     reference_3: ReferenceCircle
     reference_4: ReferenceCircle
 
+    reference_1_aux: np.array
+    reference_2_aux: np.array
+    reference_3_aux: np.array
+    reference_4_aux: np.array
+
     TRANSFORMATION_MATRIX = np.array(((-1, 0), (0, 1)))
+    homography_matrix: np.array
 
     def __init__(self, capture: cv2.VideoCapture):
         self.reference_1 = ReferenceCircle("reference_1", (132, 79), capture)
         self.reference_2 = ReferenceCircle("reference_2", (-138, 91), capture)
         self.reference_3 = ReferenceCircle("reference_3", (-138, 337), capture)
         self.reference_4 = ReferenceCircle("reference_4", (132, 335), capture)
+
+        self.reference_1_aux = np.array((0, 0))
+        self.reference_2_aux = ReferenceSystem.TRANSFORMATION_MATRIX @ (
+            self.reference_2.position_robot - self.reference_1.position_robot)
+        self.reference_3_aux = ReferenceSystem.TRANSFORMATION_MATRIX @ (
+            self.reference_3.position_robot - self.reference_1.position_robot)
+        self.reference_4_aux = ReferenceSystem.TRANSFORMATION_MATRIX @ (
+            self.reference_4.position_robot - self.reference_1.position_robot)
+
+        self.update_homography_matrix()
+
+    def update_homography_matrix(self):
+        source_points = np.array(
+            (
+                self.reference_1.position_camera,
+                self.reference_2.position_camera,
+                self.reference_3.position_camera,
+                self.reference_4.position_camera
+            )).reshape(-1, 1, 2)
+        destination_points = np.array(
+            (
+                self.reference_1_aux,
+                self.reference_2_aux,
+                self.reference_3_aux,
+                self.reference_4_aux
+            )).reshape(-1, 1, 2)
+
+        H, mask = cv2.findHomography(
+            source_points, destination_points, cv2.RANSAC, 5.0)
+        self.homography_matrix = H
+
+    def get_robot_coordinates(self, target_x_camera: int, target_y_camera: int):
+        target_point_camera = np.array((target_x_camera, target_y_camera, 1))
+        target_point_robot_new = self.homography_matrix @ target_point_camera
+        target_point_camera = target_point_camera[:2]
+        target_point_robot = np.array((0, 0))
+        target_point_robot[0] = self.reference_1.position_robot[0] - \
+            target_point_robot_new[0]
+        target_point_robot[1] = self.reference_1.position_robot[1] + \
+            target_point_robot_new[1]
+
+        return target_point_robot
 
 
 TRANSFORMATION_MATRIX = np.array(((-1, 0), (0, 1)))
@@ -121,29 +180,30 @@ def get_new_reference(new_zero: ReferenceCircle, current_reference: ReferenceCir
 
 if __name__ == "__main__":
     from predicter import EggPredicter
-    egg_predicter = EggPredicter(confidence_threshold=0.15)
+    capture = cv2.VideoCapture(index=2)
+    egg_predicter = EggPredicter(confidence_threshold=0.15, capture=capture)
 
     # image = cv2.imread(
     #     "homography-2.png")
 
-    reference_1 = ReferenceCircle("reference_1", (132, 79))
-    reference_2 = ReferenceCircle("reference_2", (-138, 91))
-    reference_3 = ReferenceCircle("reference_3", (-138, 337))
-    reference_4 = ReferenceCircle("reference_4", (132, 335))
+    reference_1 = ReferenceCircle("reference_1", (132, 79), capture)
+    reference_2 = ReferenceCircle("reference_2", (-138, 91), capture)
+    reference_3 = ReferenceCircle("reference_3", (-138, 337), capture)
+    reference_4 = ReferenceCircle("reference_4", (132, 335), capture)
 
-    reference_1.update_roi()
+    reference_1.update_roi(capture)
     while reference_1.position_camera is None:
         reference_1.update_position_camera()
 
-    reference_2.update_roi()
+    reference_2.update_roi(capture)
     while reference_2.position_camera is None:
         reference_2.update_position_camera()
 
-    # reference_3.update_roi()
+    reference_3.update_roi(capture)
     while reference_3.position_camera is None:
         reference_3.update_position_camera()
 
-    # reference_4.update_roi()
+    reference_4.update_roi(capture)
     while reference_4.position_camera is None:
         reference_4.update_position_camera()
 
@@ -186,10 +246,10 @@ if __name__ == "__main__":
         if not ret:
             print("Could not read camera")
             continue
-        # reference_1.draw(frame)
-        # reference_2.draw(frame)
-        # reference_3.draw(frame)
-        # reference_4.draw(frame)
+        reference_1.draw(frame)
+        reference_2.draw(frame)
+        reference_3.draw(frame)
+        reference_4.draw(frame)
 
         try:
             predictions = egg_predicter.predict(frame)
@@ -216,81 +276,8 @@ if __name__ == "__main__":
             print(e)
             continue
 
-        # print(reference_1.position_robot)
-        # print(target_point_robot_new)
-
         cv2.imshow('Reference System', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     capture.release()
     cv2.destroyAllWindows()
-
-    exit()
-
-    # reference_1.update_roi()
-    # while reference_1.position_camera is None:
-    #     reference_1.update_position_camera()
-
-    # reference_2.update_roi()
-    # while reference_2.position_camera is None:
-    #     reference_2.update_position_camera()
-
-    # reference_3.update_roi()
-    # while reference_3.position_camera is None:
-    #     reference_3.update_position_camera()
-
-    # while True:
-    #     ret, frame = capture.read()
-    #     if not ret:
-    #         print("Error reading image from camera")
-    #         continue
-
-    #     reference_1.draw(frame)
-    #     reference_2.draw(frame)
-    #     reference_3.draw(frame)
-
-    #     cv2.imshow('Reference System', frame)
-
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):
-    #         break
-
-    # capture.release()
-    # cv2.destroyAllWindows()
-    # exit()
-# capture = cv2.VideoCapture(index=2)
-
-
-#     red_circle_frame = red_circle_roi.get_frame(frame)
-#     red_circle_roi.draw(frame)
-
-#     gray = cv2.cvtColor(red_circle_frame, cv2.COLOR_BGR2GRAY)
-#     gray_blurred = cv2.GaussianBlur(gray, (9, 9), 2)
-#     circles = cv2.HoughCircles(
-#         gray_blurred,
-#         cv2.HOUGH_GRADIENT,
-#         dp=1, minDist=50, param1=50, param2=32, minRadius=int(max(red_circle_roi.width, red_circle_roi.height)/5),
-#         maxRadius=int(max(red_circle_roi.width, red_circle_roi.height)/2)
-#     )
-
-#     if circles is not None:
-#         circles = np.uint16(np.around(circles))
-#         for i in circles[0, :]:
-
-#             cv2.circle(frame,
-#                        (i[0] + red_circle_roi.x, i[1] + red_circle_roi.y),
-#                        i[2],
-#                        (0, 140, 255),
-#                        thickness=1)
-#             cv2.circle(frame,
-#                        (i[0] + red_circle_roi.x, i[1]+red_circle_roi.y),
-#                        2,
-#                        (0, 140, 255),
-#                        thickness=2)
-
-#     cv2.imshow('Reference System', frame)
-
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         break
-
-# capture.release()
-# cv2.destroyAllWindows()
