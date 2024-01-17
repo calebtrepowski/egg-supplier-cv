@@ -5,6 +5,8 @@ import threading
 from PIL import Image, ImageTk
 from reference_system import ReferenceSystem, ReferenceCircle
 from predicter import EggPredicter
+from conveyer_belt import ConveyerBelt
+from scara_robot import ScaraRobot
 
 
 class EggSupplierCV:
@@ -14,13 +16,17 @@ class EggSupplierCV:
     reference_system: ReferenceSystem
     egg_predicter: EggPredicter
     confidence_threshold: tk.DoubleVar
+    belt: ConveyerBelt
+    scara_robot: ScaraRobot
 
-    def __init__(self, video_source=0):
+    def __init__(self, /, video_source=0, belt_port: str = "", robot_port: str = ""):
 
         self.window = tk.Tk()
         self.window.title("Envasador de Huevos - GUI")
         self.window.bind('<Escape>', lambda e: self.window.quit())
         self.window.bind('q', lambda e: self.window.quit())
+        self.window.bind('w', lambda e: self.stop_thread()
+                         if self.is_running else self.start_thread())
         self.window.minsize(1100, 580)
 
         self.video_capture = cv2.VideoCapture(video_source)
@@ -48,6 +54,9 @@ class EggSupplierCV:
             while circle.position_camera is None:
                 circle.update_roi(self.video_capture)
                 circle.update_position_camera(self.video_capture)
+
+        # self.belt = ConveyerBelt(belt_port, 115200)
+        self.scara_robot = ScaraRobot(robot_port, 115200)
 
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -117,12 +126,12 @@ class EggSupplierCV:
         self.robot_frame.grid(row=0, column=1, sticky=tk.NS)
 
         self.robot_calibrate_button = ttk.Button(
-            self.robot_frame, text="Calibrar limites", command=lambda: ...)
+            self.robot_frame, text="Calibrar limites", command=lambda: self.update_g_code_text(self.scara_robot.go_to_limit()))
         self.robot_calibrate_button.grid(
             row=0, column=0, columnspan=2, sticky=tk.EW, pady=2)
 
         self.robot_home_button = ttk.Button(
-            self.robot_frame, text="Ir a Home", command=lambda: ...)
+            self.robot_frame, text="Ir a Home", command=lambda: self.update_g_code_text(self.scara_robot.go_to_articular_coordinate(j1=0, j2=0, j3=0, j4=0)))
         self.robot_home_button.grid(
             row=1, column=0, columnspan=2, sticky=tk.EW, pady=2)
 
@@ -140,28 +149,22 @@ class EggSupplierCV:
         self.g_code_text.grid(row=3, column=0, sticky=tk.NSEW)
         self.g_code_scrollbar.grid(row=3, column=1, sticky=tk.NS)
 
-        multiline_text = """This is a multiline text.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-You can add as many lines as you want.
-1
-2
-3
-4
-5
-6
-7
-8
-You can add as many lines as you want.
-Scroll down to see more text."""
-        self.g_code_text.insert(tk.END, multiline_text)
         self.g_code_text.config(state=tk.DISABLED)
+
+        ttk.Separator(self.robot_frame, orient=tk.HORIZONTAL).grid(
+            row=4, columnspan=2, sticky=tk.EW, pady=10)
+
+        self.terminal_input_entry = ttk.Entry(self.robot_frame)
+        self.terminal_input_entry.grid(
+            row=5, columnspan=2, sticky=tk.EW, pady=2)
+        self.terminal_input_entry.bind(
+            "<Return>", lambda e: self.send_command())
+        self.terminal_input_entry.bind(
+            "<KP_Enter>", lambda e: self.send_command())
+        self.terminal_send_button = ttk.Button(
+            self.robot_frame, text="Enviar comando", command=self.send_command)
+        self.terminal_send_button.grid(
+            row=6, columnspan=2, sticky=tk.EW, pady=2)
 
     def update(self):
         _, frame = self.video_capture.read()
@@ -176,6 +179,17 @@ Scroll down to see more text."""
 
             try:
                 predictions = self.egg_predicter.predict(frame)
+                for i, p in enumerate(predictions):
+                    target_point_robot = self.reference_system.get_robot_coordinates(
+                        p.cx, p.cy)
+                    p.draw(frame, number=i)
+                    cv2.putText(frame,
+                                f"{i}: ({target_point_robot[0]:.2f},{target_point_robot[1]:.2f})",
+                                (450, 470-20*i),
+                                cv2.FONT_ITALIC,
+                                fontScale=0.55,
+                                color=(0, 0, 255),
+                                thickness=2)
             except Exception as e:
                 print(e)
 
@@ -200,6 +214,7 @@ Scroll down to see more text."""
 
     def on_close(self):
         self.stop_thread()
+        self.scara_robot.serial_port.close()
         self.video_capture.release()
         self.window.destroy()
 
@@ -221,6 +236,7 @@ Scroll down to see more text."""
         while circle.position_camera is None:
             circle.update_roi(self.video_capture)
             circle.update_position_camera(self.video_capture)
+        self.reference_system.update_homography_matrix()
         self.window.after(500, self.start_thread)
 
     def update_eggs_roi(self):
@@ -235,6 +251,19 @@ Scroll down to see more text."""
         self.confidence_threshold.set(value)
         self.egg_predicter.set_confidence(value)
 
+    def update_g_code_text(self, command_sent: str):
+        command_sent += "\n"
+        self.g_code_text.config(state="normal")
+        self.g_code_text.insert(tk.END, command_sent)
+        self.g_code_text.config(state="disabled")
+
+    def send_command(self):
+        command = self.terminal_input_entry.get().upper()
+        self.scara_robot.serial_port.write((command + "\n").encode())
+        self.update_g_code_text(command)
+        self.terminal_input_entry.delete(0, tk.END)
+        self.terminal_input_entry.focus()
+
 
 if __name__ == "__main__":
-    EggSupplierCV(video_source=2).run()
+    EggSupplierCV(video_source=2, robot_port="/dev/ttyUSB0").run()

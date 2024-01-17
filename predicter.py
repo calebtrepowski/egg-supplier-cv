@@ -56,26 +56,26 @@ class EggPredicter:
         return predictions
 
 
-# if __name__ == "__main__":
-#     import cv2
-#     egg_predicter = EggPredicter(0.1)
+if __name__ == "__main__":
+    import cv2
+    capture = cv2.VideoCapture(2)
+    egg_predicter = EggPredicter(0.1, capture)
 
-#     # capture = cv2.VideoCapture(2)
 
-#     while True:
-#         ret, frame = capture.read()
-#         if not ret:
-#             print("Error reading image from camera")
-#             exit()
-#         try:
-#             predictions = egg_predicter.predict(frame)
-#         except Exception as e:
-#             print(e)
-#             continue
-#         cv2.imshow('Predicter', frame)
+    while True:
+        ret, frame = capture.read()
+        if not ret:
+            print("Error reading image from camera")
+            exit()
+        try:
+            predictions = egg_predicter.predict(frame)
+        except Exception as e:
+            print(e)
+            continue
+        cv2.imshow('Predicter', frame)
 
-#         if cv2.waitKey(1) & 0xFF == ord('q'):
-#             break
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-#     capture.release()
-#     cv2.destroyAllWindows()
+    capture.release()
+    cv2.destroyAllWindows()
