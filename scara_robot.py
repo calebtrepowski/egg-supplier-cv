@@ -23,7 +23,7 @@ class ScaraRobot:
         if z is not None:
             g_code_command += f" Z{z}"
 
-        self.send_command(g_code_command)
+        # self.send_command(g_code_command)
         return g_code_command
 
     def go_to_articular_coordinate(self, /,
@@ -42,7 +42,7 @@ class ScaraRobot:
         if j4 is not None:
             g_code_command += f" L{j4}"
 
-        self.send_command(g_code_command)
+        # self.send_command(g_code_command)
         return g_code_command
 
     def set_articular_coordinate(self, /,
@@ -61,12 +61,24 @@ class ScaraRobot:
         if j4 is not None:
             g_code_command += f" L{j4}"
 
-        self.send_command(g_code_command)
+        # self.send_command(g_code_command)
         return g_code_command
 
     def go_to_limit(self):
         g_code_command = "G10"
-        self.send_command(g_code_command)
+        # self.send_command(g_code_command)
+        # self.send_command("G12 L-135")
+        return g_code_command
+
+    def act_tool(self, value: int = 255):
+        g_code_command = "G20"
+        g_code_command = "G20" + " P" + str(value)
+        # self.send_command(g_code_command)
+        return g_code_command
+
+    def release_tool(self):
+        g_code_command = "G21"
+        # self.send_command(g_code_command)
         return g_code_command
 
     def send_command(self, command: str):

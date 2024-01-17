@@ -19,13 +19,14 @@ class ReferenceCircle:
         self.radius_camera = None
 
         try:
-            with open(f"calibration_params/position_camera_{self.label}.txt") as f:
+            with open(f"position_camera_{self.label}.txt") as f:
                 position_camera_str = f.read().rstrip("\n").split(",")
                 x, y, radius = [int(i) for i in position_camera_str]
                 self.position_camera = np.array((x, y))
                 self.radius_camera = radius
         except Exception as e:
             print(f"Couldn't read camera position of {self.label}")
+            # exit()
 
     def update_roi(self, capture: cv2.VideoCapture):
         self.roi.save(capture)
@@ -95,7 +96,7 @@ class ReferenceCircle:
                  max_circle[1]+self.roi.y))
             self.radius_camera = max_circle[2]
 
-            with open(f"calibration_params/position_camera_{self.label}.txt", "w") as f:
+            with open(f"position_camera_{self.label}.txt", "w") as f:
                 write_str = f"{self.position_camera[0]},{self.position_camera[1]},{self.radius_camera}\n"
                 f.write(write_str)
 
@@ -193,19 +194,19 @@ if __name__ == "__main__":
 
     reference_1.update_roi(capture)
     while reference_1.position_camera is None:
-        reference_1.update_position_camera()
+        reference_1.update_position_camera(capture)
 
     reference_2.update_roi(capture)
     while reference_2.position_camera is None:
-        reference_2.update_position_camera()
+        reference_2.update_position_camera(capture)
 
     reference_3.update_roi(capture)
     while reference_3.position_camera is None:
-        reference_3.update_position_camera()
+        reference_3.update_position_camera(capture)
 
     reference_4.update_roi(capture)
     while reference_4.position_camera is None:
-        reference_4.update_position_camera()
+        reference_4.update_position_camera(capture)
 
     # exit()
 
