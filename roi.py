@@ -34,19 +34,19 @@ class ROI:
 
     def save(self, capture: cv2.VideoCapture):
         x, y, w, h = self._capture(capture)
-        with open(f"roi_{self.label}.txt", "w") as f:
+        with open(f"calibration_params/roi_{self.label}.txt", "w") as f:
             f.write(f"{x},{y},{w},{h}\n")
 
     def load(self, capture: cv2.VideoCapture):
         try:
-            with open(f"roi_{self.label}.txt") as f:
+            with open(f"calibration_params/roi_{self.label}.txt") as f:
                 roi_str = f.read().rstrip("\n").split(",")
                 self.x, self.y, self.width, self.height = [
                     int(i) for i in roi_str]
 
         except Exception:
             self.save(capture)
-            with open(f"roi_{self.label}.txt") as f:
+            with open(f"calibration_params/roi_{self.label}.txt") as f:
                 roi_str = f.read().rstrip("\n").split(",")
                 self.x, self.y, self.width, self.height = [
                     int(i) for i in roi_str]

@@ -1,6 +1,5 @@
 .vscode
 .env
-roi_*.txt
 __pycache__
 dataset
-position_camera_*.txt
+calibration_params

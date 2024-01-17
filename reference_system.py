@@ -19,7 +19,7 @@ class ReferenceCircle:
         self.radius_camera = None
 
         try:
-            with open(f"position_camera_{self.label}.txt") as f:
+            with open(f"calibration_params/position_camera_{self.label}.txt") as f:
                 position_camera_str = f.read().rstrip("\n").split(",")
                 x, y, radius = [int(i) for i in position_camera_str]
                 self.position_camera = np.array((x, y))
@@ -95,7 +95,7 @@ class ReferenceCircle:
                  max_circle[1]+self.roi.y))
             self.radius_camera = max_circle[2]
 
-            with open(f"position_camera_{self.label}.txt", "w") as f:
+            with open(f"calibration_params/position_camera_{self.label}.txt", "w") as f:
                 write_str = f"{self.position_camera[0]},{self.position_camera[1]},{self.radius_camera}\n"
                 f.write(write_str)
 
