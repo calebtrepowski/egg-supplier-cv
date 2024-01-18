@@ -332,52 +332,70 @@ class EggSupplierCV:
 
     def run_supply_egg(self):
         self.is_routine_running = True
+        print("iniciando rutina!")
+        self.window.after(500, self.predict_holes)
 
-        if len(self.predictions) == 6:
-            self.stop_thread()
-            self.target_hole = None
-            for prediction in self.predictions:
-                if prediction.class_label == "hole":
-                    self.target_hole = prediction
-                    print("target hole!")
+    def predict_holes(self):
+        print("predict holes 1")
+        if not self.is_routine_running:
+            return
+        print("predict holes 2")
+
+        if self.is_robot_busy:
+            self.window.after(1000, self.predict_holes)
+
+        for i in range(2500):
+            # if len(self.predictions) >= 6:
+            if True:
+                self.target_hole = None
+                for prediction in self.predictions:
+                    if prediction.class_label == "hole":
+                        self.target_hole = prediction
+                        print("target hole!")
+                        self.stop_thread()
+                        break
+                if self.target_hole is not None:
+                    if self.supply_system.next_egg_index < len(self.supply_system.supply_eggs):
+                        supply_egg = self.supply_system.supply_eggs[self.supply_system.next_egg_index]
+                        target_point_robot = self.reference_system.get_robot_coordinates(
+                            self.target_hole.cx, self.target_hole.cy)
+
+                        self.current_command = 0
+
+                        self.commands_list = (
+                            self.scara_robot.go_to_articular_coordinate(
+                                j2=SupplySystem.SAFE_Z_POSITION_MM),
+                            self.scara_robot.go_to_cartesian_coordinate(
+                                x=supply_egg.grab_x_position_mm,
+                                y=supply_egg.grab_y_position_mm),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j2=SupplySystem.APPROACH_Z_POSITION_MM),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j4=supply_egg.grab_j4_angle_degrees),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j2=SupplySystem.GRAB_Z_POSITION_MM),
+                            self.scara_robot.act_tool(
+                                value=SupplySystem.GRAB_GRIPPER_VALUE),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j2=SupplySystem.SAFE_Z_POSITION_MM),
+                            self.scara_robot.go_to_cartesian_coordinate(
+                                x=target_point_robot[0], y=target_point_robot[1]),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j2=SupplySystem.RELEASE_Z_POSITION_MM),
+                            self.scara_robot.release_tool(),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j2=SupplySystem.SAFE_Z_POSITION_MM),
+                            self.scara_robot.go_to_articular_coordinate(
+                                j1=0,
+                                j3=0)
+                        )
+                    self.callbacks_ids.append(
+                        self.window.after(500, self.execute_next_command))
+                    self.is_robot_busy = True
                     break
-            if self.target_hole is not None:
-                if self.supply_system.next_egg_index < len(self.supply_system.supply_eggs):
-                    supply_egg = self.supply_system.supply_eggs[self.supply_system.next_egg_index]
-                    target_point_robot = self.reference_system.get_robot_coordinates(
-                        self.target_hole.cx, self.target_hole.cy)
-
-                    self.current_command = 0
-
-                    self.commands_list = (
-                        self.scara_robot.go_to_articular_coordinate(
-                            j2=SupplySystem.SAFE_Z_POSITION_MM),
-                        self.scara_robot.go_to_cartesian_coordinate(
-                            x=supply_egg.grab_x_position_mm,
-                            y=supply_egg.grab_y_position_mm),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j2=SupplySystem.APPROACH_Z_POSITION_MM),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j4=supply_egg.grab_j4_angle_degrees),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j2=SupplySystem.GRAB_Z_POSITION_MM),
-                        self.scara_robot.act_tool(
-                            value=SupplySystem.GRAB_GRIPPER_VALUE),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j2=SupplySystem.SAFE_Z_POSITION_MM),
-                        self.scara_robot.go_to_cartesian_coordinate(
-                            x=target_point_robot[0], y=target_point_robot[1]),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j2=SupplySystem.RELEASE_Z_POSITION_MM),
-                        self.scara_robot.release_tool(),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j2=SupplySystem.SAFE_Z_POSITION_MM),
-                        self.scara_robot.go_to_articular_coordinate(
-                            j1=0,
-                            j3=0)
-                    )
-                self.callbacks_ids.append(
-                    self.window.after(500, self.execute_next_command))
+        if self.target_hole is None:
+            print("no detectado")
+            self.is_routine_running = False
 
     def execute_next_command(self):
         print("execute next command")
@@ -388,9 +406,15 @@ class EggSupplierCV:
                     f"next_command!: {self.commands_list[self.current_command]}")
                 self.send_command(self.commands_list[self.current_command])
                 self.current_command += 1
-                self.callbacks_ids.append(self.window.after(1000, self.execute_next_command))
+                self.callbacks_ids.append(self.window.after(
+                    1000, self.execute_next_command))
             else:
+                print("huevo entregado")
                 self.commands_list = tuple()
+                self.start_thread()
+                self.window.after(5000, self.predict_holes)
+                self.is_robot_busy = False
+                self.supply_system.next_egg_index += 1
         elif self.robot_status is None:
             self.callbacks_ids.append(self.window.after(
                 1000, self.execute_next_command))
