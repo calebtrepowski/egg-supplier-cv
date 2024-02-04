@@ -27,3 +27,15 @@ Run commands as root if necessary.
     ```bash
     docker attach roboflow-server
     ```
+
+## GUI and main program
+
+Modify `video_source` and `robot_port` if necessary.
+
+```bash
+python3 egg_supplier_cv.py
+```
+
+![Gui screenshot](./demos/gui_screenshot.jpg)
+
+![Working demo](./demos/scara-cv-egg-supplier.mp4)
