@@ -1,5 +1,10 @@
 # Egg supplier with Computer Vision and Scara Robotic Arm
 
+Team members:
+- [Maximiliano Butlerov](https://github.com/mbutlerov)
+- Guillermo Ocampos
+- [Caleb Trepowski](https://github.com/calebtrepowski)
+
 ## Roboflow Server (self hosted on same machine)
 
 Run commands as root if necessary.
