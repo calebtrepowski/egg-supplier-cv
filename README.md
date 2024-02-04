@@ -38,4 +38,4 @@ python3 main.py
 
 ![Gui screenshot](./demos/gui_screenshot.jpg)
 
-Here's a [working video demo](./demos/scara-cv-egg-supplier.mp4)
+Here's a [working video demo](https://drive.google.com/file/d/1SxGCYM9XJyWuuOgOleMaBsQY9g8OEJad/view?usp=sharing)
