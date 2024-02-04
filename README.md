@@ -33,9 +33,9 @@ Run commands as root if necessary.
 Modify `video_source` and `robot_port` if necessary.
 
 ```bash
-python3 egg_supplier_cv.py
+python3 main.py
 ```
 
 ![Gui screenshot](./demos/gui_screenshot.jpg)
 
-![Working demo](./demos/scara-cv-egg-supplier.mp4)
+Here's a [working video demo](./demos/scara-cv-egg-supplier.mp4)
