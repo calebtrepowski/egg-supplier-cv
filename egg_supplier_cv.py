@@ -25,6 +25,7 @@ class EggSupplierCV:
 
     is_routine_running: bool
     continue_routine: bool
+    is_conveyer_running: bool
 
     robot_status: int
 
@@ -72,6 +73,7 @@ class EggSupplierCV:
         self.is_predicter_running = False
         self.is_routine_running = False
         self.continue_routine = False
+        self.is_conveyer_running = False
 
         self.reference_system = ReferenceSystem(self.video_capture)
 
@@ -333,6 +335,8 @@ class EggSupplierCV:
     def run_supply_egg(self):
         self.is_routine_running = True
         print("iniciando rutina!")
+        self.is_conveyer_running = True
+        print("Girando cinta!")
         self.window.after(500, self.predict_holes)
 
     def predict_holes(self):
@@ -352,6 +356,7 @@ class EggSupplierCV:
                     if prediction.class_label == "hole":
                         self.target_hole = prediction
                         print("target hole!")
+                        print("Deteniendo cinta!")
                         self.stop_thread()
                         break
                 if self.target_hole is not None:
@@ -389,13 +394,22 @@ class EggSupplierCV:
                                 j1=0,
                                 j3=0)
                         )
+                    else:
+                        print("no more eggs")
+                        self.commands_list = tuple()
+                        self.start_thread()
+                        break
                     self.callbacks_ids.append(
                         self.window.after(500, self.execute_next_command))
                     self.is_robot_busy = True
                     break
         if self.target_hole is None:
-            print("no detectado")
-            self.is_routine_running = False
+            print("no hueco detectado")
+            if len(self.predictions) == 6:
+                print("plancha completa")
+                print("Moviendo cinta!")
+            self.window.after(1500, self.predict_holes)
+            # self.is_routine_running = False
 
     def execute_next_command(self):
         print("execute next command")
@@ -412,7 +426,7 @@ class EggSupplierCV:
                 print("huevo entregado")
                 self.commands_list = tuple()
                 self.start_thread()
-                self.window.after(5000, self.predict_holes)
+                self.window.after(6000, self.predict_holes)
                 self.is_robot_busy = False
                 self.supply_system.next_egg_index += 1
         elif self.robot_status is None:
