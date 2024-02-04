@@ -2,7 +2,7 @@
 
 Team members:
 - [Maximiliano Butlerov](https://github.com/mbutlerov)
-- Guillermo Ocampos
+- [Guillermo Ocampos](https://github.com/GOcampos91)
 - [Caleb Trepowski](https://github.com/calebtrepowski)
 
 ## Roboflow Server (self hosted on same machine)
